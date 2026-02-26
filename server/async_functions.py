@@ -1,15 +1,23 @@
 import asyncio
+import json
+import os
+import random
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from playwright.async_api import async_playwright
 
 app = FastAPI()
-import os
 from dotenv import load_dotenv
 load_dotenv()
 
-
 # global state managers
 TARGET_SITE_URL = os.getenv("TARGET_SITE_URL")
+
+PROXY_FILE = os.getenv("PROXIES_LIST1")
+with open(PROXY_FILE) as f:
+    PROXIES = json.load(f)
+
+PROXY_USERNAME = os.getenv("PROXY_USERNAME")
+PROXY_PASSWORD = os.getenv("PROXY_PASSWORD")
 
 session_states = {
     i: {
@@ -21,7 +29,8 @@ session_states = {
     } for i in range(1, 6)
 }
 session_events = {i: asyncio.Event() for i in range(1, 6)}
-session_commands = {i: "auto" for i in range(1, 6)} 
+session_commands = {i: "auto" for i in range(1, 6)}
+session_proxies = {i: None for i in range(1, 6)}  # populated at start time
 # Store connected UI clients
 connected_clients = []
 
@@ -33,11 +42,16 @@ async def broadcast_state():
         except Exception:
             pass
 
-async def run_bot(session_id: int, is_visible: bool, target_url: str = TARGET_SITE_URL):
+async def run_bot(session_id: int, is_visible: bool, target_url: str = TARGET_SITE_URL, proxy: dict = None):
     #playwright bot logic
+    proxy_config = {
+        "server": f"http://{proxy['entryPoint']}:{proxy['port']}",
+        "username": PROXY_USERNAME,
+        "password": PROXY_PASSWORD,
+    } if proxy else None
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=not is_visible)
-        context = await browser.new_context()
+        context = await browser.new_context(proxy=proxy_config)
         page = await context.new_page()
         try:
             # enter queue

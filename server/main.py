@@ -4,8 +4,9 @@ from fastapi import (
     WebSocketDisconnect)
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
-from async_functions import run_bot, session_states, session_events, session_commands, connected_clients, broadcast_state
+from async_functions import run_bot, session_states, session_events, session_commands, session_proxies, PROXIES, connected_clients, broadcast_state
 import asyncio
+import random
 import os
 from dotenv import load_dotenv
 from playwright.async_api import async_playwright
@@ -30,6 +31,7 @@ def check_server():
 
 class StartTestRequest(BaseModel):
     target_url: str
+    use_proxy: bool = False
 
 active_tasks = {}
 
@@ -38,17 +40,26 @@ async def start_test(body: StartTestRequest):
     """Endpoint to trigger the 5 bots from your UI."""
     target_url = body.target_url or TARGET_SITE_URL
 
-    # Reset states and events for a fresh run
-    for i in range(1, 6):
-        session_states[i]["status"] = "starting"
-        session_events[i].clear()
+    if body.use_proxy:
+        shuffled = random.sample(PROXIES, len(PROXIES))
+        for i in range(1, 6):
+            session_proxies[i] = shuffled[i - 1]
+            session_states[i]["ip"] = shuffled[i - 1]["ip"]
+            session_states[i]["status"] = "starting"
+            session_events[i].clear()
+    else:
+        for i in range(1, 6):
+            session_proxies[i] = None
+            session_states[i]["ip"] = "Local"
+            session_states[i]["status"] = "starting"
+            session_events[i].clear()
     await broadcast_state()
 
     # concurrent background tasks for all 5 bots
     for i in range(1, 6):
         # Make ONLY Session 1 visible for manual testing
         is_visible = (i == 1)
-        task = asyncio.create_task(run_bot(i, is_visible, target_url=target_url))
+        task = asyncio.create_task(run_bot(i, is_visible, target_url=target_url, proxy=session_proxies[i]))
         active_tasks[i] = task
 
     return {"message": "5 Sessions Launched"}

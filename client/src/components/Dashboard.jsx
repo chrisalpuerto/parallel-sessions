@@ -4,6 +4,8 @@ import GraphWidget from './GraphWidget'
 
 export default function Dashboard() {
   const [targetUrl, setTargetUrl] = useState('')
+  const [committedUrl, setCommittedUrl] = useState('')
+  const [useProxy, setUseProxy] = useState(false)
   const [testActive, setTestActive] = useState(false)
   const [sessions, setSessions] = useState({})
   const wsRef = useRef(null)
@@ -31,10 +33,11 @@ export default function Dashboard() {
 
   const handleStart = async () => {
     if (!targetUrl.trim()) return
+    setCommittedUrl(targetUrl.trim())
     await fetch('http://localhost:8000/start-test', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ target_url: targetUrl.trim() }),
+      body: JSON.stringify({ target_url: targetUrl.trim(), use_proxy: useProxy }),
     })
     setTestActive(true)
   }
@@ -115,6 +118,40 @@ export default function Dashboard() {
         borderRadius: '14px',
         padding: '16px 20px',
       }}>
+        {/* Local / Proxy toggle */}
+        <div style={{
+          display: 'flex',
+          background: 'rgba(255,255,255,0.06)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: '8px',
+          padding: '3px',
+          gap: '2px',
+          flexShrink: 0,
+          opacity: testActive ? 0.4 : 1,
+          pointerEvents: testActive ? 'none' : 'auto',
+        }}>
+          {[{ label: 'Local', value: false }, { label: 'Proxy IPs', value: true }].map(({ label, value }) => (
+            <button
+              key={label}
+              onClick={() => setUseProxy(value)}
+              style={{
+                padding: '6px 14px',
+                borderRadius: '6px',
+                border: 'none',
+                background: useProxy === value ? '#6c63ff' : 'transparent',
+                color: useProxy === value ? '#fff' : 'rgba(255,255,255,0.4)',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.15s',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
         <label style={{ fontSize: '13px', fontWeight: 500, color: 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap' }}>
           Target Site URL
         </label>
@@ -183,7 +220,7 @@ export default function Dashboard() {
         gap: '24px',
         alignItems: 'start',
       }}>
-        <SessionsTable sessions={sessions} sendCommand={sendCommand} targetUrl={targetUrl} />
+        <SessionsTable sessions={sessions} sendCommand={sendCommand} targetUrl={committedUrl} />
 
         <div style={{ height: '420px' }}>
           <GraphWidget />

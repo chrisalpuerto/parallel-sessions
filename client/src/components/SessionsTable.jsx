@@ -175,8 +175,8 @@ function SessionRow({ session, sendCommand, targetSite }) {
         </div>
       </td>
 
-      <td style={{ ...COL_STYLE, color: 'rgba(255,255,255,0.55)', fontSize: '13px' }}>
-        {session.email}
+      <td style={{ ...COL_STYLE, color: 'rgba(255,255,255,0.3)', fontSize: '13px', fontStyle: 'italic' }}>
+        awaiting
       </td>
       <td style={COL_STYLE}>
         <OptionBadge option={session.option} />
