@@ -1,19 +1,14 @@
 from fastapi import (
-    Body, 
-    FastAPI, 
-    UploadFile,
-      File, 
-      HTTPException,
-        Request,
-          Response,
-            WebSocket,
-              WebSocketDisconnect)
+    FastAPI,
+    WebSocket,
+    WebSocketDisconnect)
+from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from async_functions import run_bot, session_states, session_events, session_commands, connected_clients, broadcast_state
 import asyncio
-import websocket
 import os
 from dotenv import load_dotenv
+from playwright.async_api import async_playwright
 load_dotenv()
 
 
@@ -33,30 +28,29 @@ app.add_middleware(
 def check_server():
     return {"message": "Server is up and running"}
 
+class StartTestRequest(BaseModel):
+    target_url: str
+
 active_tasks = {}
 
 @app.post("/start-test")
-async def start_test(
-    target_url: str = None
-):
+async def start_test(body: StartTestRequest):
     """Endpoint to trigger the 5 bots from your UI."""
+    target_url = body.target_url or TARGET_SITE_URL
+
     # Reset states and events for a fresh run
     for i in range(1, 6):
-        session_states[i] = "Starting..."
+        session_states[i]["status"] = "starting"
         session_events[i].clear()
     await broadcast_state()
 
-    #  concurrent background tasks for all 5 bots
-    tasks = []
+    # concurrent background tasks for all 5 bots
     for i in range(1, 6):
         # Make ONLY Session 1 visible for manual testing
         is_visible = (i == 1)
-        if target_url is None:
-            target_url = TARGET_SITE_URL
         task = asyncio.create_task(run_bot(i, is_visible, target_url=target_url))
-        tasks.append(task)
         active_tasks[i] = task
-    
+
     return {"message": "5 Sessions Launched"}
 
 @app.post("/stop-test")
@@ -100,6 +94,4 @@ async def websocket_endpoint(websocket: WebSocket):
 
 @app.get("/sessions")
 def get_sessions():
-    # returns a list of session objects
-    # each session object contains: instance number, IP (if using proxies), status, email, and chosen option
     return list(session_states.values())

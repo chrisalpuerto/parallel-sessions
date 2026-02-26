@@ -1,7 +1,49 @@
+import { useState, useEffect, useRef, useCallback } from 'react'
 import SessionsTable from './SessionsTable'
 import GraphWidget from './GraphWidget'
 
 export default function Dashboard() {
+  const [targetUrl, setTargetUrl] = useState('')
+  const [testActive, setTestActive] = useState(false)
+  const [sessions, setSessions] = useState({})
+  const wsRef = useRef(null)
+
+  useEffect(() => {
+    const ws = new WebSocket('ws://localhost:8000/ws')
+    wsRef.current = ws
+
+    ws.onmessage = (event) => {
+      try {
+        setSessions(JSON.parse(event.data))
+      } catch {
+        // ignore malformed messages
+      }
+    }
+
+    return () => ws.close()
+  }, [])
+
+  const sendCommand = useCallback((sessionId, command) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ session_id: sessionId, command }))
+    }
+  }, [])
+
+  const handleStart = async () => {
+    if (!targetUrl.trim()) return
+    await fetch('http://localhost:8000/start-test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ target_url: targetUrl.trim() }),
+    })
+    setTestActive(true)
+  }
+
+  const handleStop = async () => {
+    await fetch('http://localhost:8000/stop-test', { method: 'POST' })
+    setTestActive(false)
+  }
+
   return (
     <div style={{
       minHeight: '100vh',
@@ -19,7 +61,6 @@ export default function Dashboard() {
         justifyContent: 'space-between',
         gap: '24px',
       }}>
-        {/* Greeting - top left */}
         <div>
           <h1 style={{
             fontSize: '26px',
@@ -64,6 +105,77 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Control bar */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        background: 'rgba(255,255,255,0.04)',
+        border: '1px solid rgba(255,255,255,0.08)',
+        borderRadius: '14px',
+        padding: '16px 20px',
+      }}>
+        <label style={{ fontSize: '13px', fontWeight: 500, color: 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap' }}>
+          Target Site URL
+        </label>
+        <input
+          type="url"
+          value={targetUrl}
+          onChange={e => setTargetUrl(e.target.value)}
+          placeholder="https://example.com"
+          style={{
+            flex: 1,
+            background: 'rgba(255,255,255,0.06)',
+            border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: '8px',
+            padding: '9px 14px',
+            fontSize: '14px',
+            color: '#fff',
+            outline: 'none',
+            fontFamily: 'monospace',
+          }}
+          onKeyDown={e => e.key === 'Enter' && !testActive && handleStart()}
+        />
+        {!testActive ? (
+          <button
+            onClick={handleStart}
+            disabled={!targetUrl.trim()}
+            style={{
+              padding: '9px 20px',
+              borderRadius: '8px',
+              border: 'none',
+              background: targetUrl.trim() ? '#6c63ff' : 'rgba(108,99,255,0.3)',
+              color: targetUrl.trim() ? '#fff' : 'rgba(255,255,255,0.3)',
+              fontSize: '13px',
+              fontWeight: 600,
+              cursor: targetUrl.trim() ? 'pointer' : 'not-allowed',
+              whiteSpace: 'nowrap',
+              transition: 'background 0.15s',
+            }}
+          >
+            Start Bots
+          </button>
+        ) : (
+          <button
+            onClick={handleStop}
+            style={{
+              padding: '9px 20px',
+              borderRadius: '8px',
+              background: 'rgba(255,82,82,0.15)',
+              color: '#ff5252',
+              fontSize: '13px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              border: '1px solid rgba(255,82,82,0.3)',
+              transition: 'background 0.15s',
+            }}
+          >
+            Stop Bots
+          </button>
+        )}
+      </div>
+
       {/* Main content grid */}
       <div style={{
         display: 'grid',
@@ -71,10 +183,8 @@ export default function Dashboard() {
         gap: '24px',
         alignItems: 'start',
       }}>
-        {/* Left — Sessions table */}
-        <SessionsTable />
+        <SessionsTable sessions={sessions} sendCommand={sendCommand} targetUrl={targetUrl} />
 
-        {/* Right — Graph */}
         <div style={{ height: '420px' }}>
           <GraphWidget />
         </div>
@@ -85,6 +195,8 @@ export default function Dashboard() {
           0%, 100% { opacity: 1; box-shadow: 0 0 8px #00e676; }
           50% { opacity: 0.6; box-shadow: 0 0 14px #00e676; }
         }
+        input::placeholder { color: rgba(255,255,255,0.2); }
+        input:focus { border-color: rgba(108,99,255,0.5) !important; }
       `}</style>
     </div>
   )

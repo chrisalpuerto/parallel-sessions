@@ -41,14 +41,14 @@ async def run_bot(session_id: int, is_visible: bool, target_url: str = TARGET_SI
         page = await context.new_page()
         try:
             # enter queue
-            session_states[session_id] = "running"
+            session_states[session_id]["status"] = "running"
             await broadcast_state()
             # URL input
-            await page.goto(target_url) 
+            await page.goto(target_url)
             # Simulate waiting in a queue (normally you'd wait for a selector here)
-            await asyncio.sleep(3) 
-            # 2. queue passd, now waiting for UI input
-            session_states[session_id] = "awaiting_orders"
+            await asyncio.sleep(3)
+            # 2. queue passed, now waiting for UI input
+            session_states[session_id]["status"] = "awaiting_orders"
             await broadcast_state()
             print(f"[Bot {session_id}] Passed queue. Waiting for you to click a button in UI...")
             await session_events[session_id].wait()
@@ -57,25 +57,25 @@ async def run_bot(session_id: int, is_visible: bool, target_url: str = TARGET_SI
             command = session_commands[session_id]
             session_states[session_id]["option"] = command
             await broadcast_state()
-            
+
             if command == "manual":
-                session_states[session_id] = "Manual Takeover Active"
+                session_states[session_id]["status"] = "manual_takeover"
                 await broadcast_state()
                 print(f"[Bot {session_id}] Handing over to you. Use the browser window.")
                 # Playwright pauses, allowing you to physically click around
-                await page.pause() 
-                
+                await page.pause()
+
             elif command == "auto":
-                session_states[session_id] = "Running Auto Script"
+                session_states[session_id]["status"] = "running_auto"
                 await broadcast_state()
                 print(f"[Bot {session_id}] Executing automated payload...")
                 # Put your automated typing/clicking here
                 await asyncio.sleep(2) # Simulating work
-                
-            session_states[session_id] = "Finished Successfully"
-            
-        except Exception as e:
-            session_states[session_id] = f"Error: {str(e)}"
+
+            session_states[session_id]["status"] = "finished"
+
+        except Exception:
+            session_states[session_id]["status"] = "error"
         finally:
             await broadcast_state()
             await context.close()
