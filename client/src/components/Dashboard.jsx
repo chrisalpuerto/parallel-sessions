@@ -72,7 +72,7 @@ export default function Dashboard() {
             lineHeight: 1.2,
             letterSpacing: '-0.02em',
           }}>
-            Hey, Chris{' '}
+            hi{' '}
             <span style={{ display: 'inline-block' }} role="img" aria-label="waving hand">👋</span>
           </h1>
           <p style={{
@@ -81,7 +81,7 @@ export default function Dashboard() {
             color: 'rgba(255,255,255,0.35)',
             fontWeight: 400,
           }}>
-            Here's what's running today.
+            This is definitely not a bot
           </p>
         </div>
 
