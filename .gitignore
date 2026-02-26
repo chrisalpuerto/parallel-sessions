@@ -1,2 +1,7 @@
 server/venv
 .venv/
+client/node_modules
+.node_modules/
+node_modules/
+server/.env
+.env
