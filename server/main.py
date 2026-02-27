@@ -46,12 +46,14 @@ async def start_test(body: StartTestRequest):
             session_proxies[i] = shuffled[i - 1]
             session_states[i]["ip"] = shuffled[i - 1]["ip"]
             session_states[i]["status"] = "starting"
+            session_states[i]["action"] = "Idle"
             session_events[i].clear()
     else:
         for i in range(1, 6):
             session_proxies[i] = None
             session_states[i]["ip"] = "Local"
             session_states[i]["status"] = "starting"
+            session_states[i]["action"] = "Idle"
             session_events[i].clear()
     await broadcast_state()
 
@@ -82,11 +84,11 @@ async def websocket_endpoint(websocket: WebSocket):
     #handles the real-time connection for React
     await websocket.accept()
     connected_clients.append(websocket)
-    
-    # Send initial state immediately upon connection
-    await websocket.send_json(session_states)
-    
+
     try:
+        # Send initial state immediately upon connection
+        await websocket.send_json(session_states)
+
         while True:
             # Listen for button clicks from React 
             # Expected format: {"session_id": 1, "command": "manual"}

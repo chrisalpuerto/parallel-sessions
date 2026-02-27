@@ -175,6 +175,17 @@ function SessionRow({ session, sendCommand, targetSite }) {
         </div>
       </td>
 
+      {/* Action */}
+      <td style={{
+        ...COL_STYLE,
+        color: session.action && session.action !== 'Idle'
+          ? 'rgba(255,255,255,0.65)'
+          : 'rgba(255,255,255,0.25)',
+        fontSize: '13px',
+      }}>
+        {session.action || 'Idle'}
+      </td>
+
       <td style={{ ...COL_STYLE, color: 'rgba(255,255,255,0.3)', fontSize: '13px', fontStyle: 'italic' }}>
         awaiting
       </td>
@@ -236,6 +247,7 @@ export default function SessionsTable({ sessions = {}, sendCommand, targetUrl = 
               <th style={{ ...HEAD_STYLE, textAlign: 'left' }}>Target Site</th>
               <th style={{ ...HEAD_STYLE, textAlign: 'left' }}>IP Address</th>
               <th style={{ ...HEAD_STYLE, textAlign: 'left' }}>Status</th>
+              <th style={{ ...HEAD_STYLE, textAlign: 'left' }}>Action</th>
               <th style={{ ...HEAD_STYLE, textAlign: 'left' }}>Email</th>
               <th style={{ ...HEAD_STYLE, textAlign: 'left' }}>Option</th>
             </tr>
@@ -243,7 +255,7 @@ export default function SessionsTable({ sessions = {}, sendCommand, targetUrl = 
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={6} style={{ ...COL_STYLE, textAlign: 'center', color: 'rgba(255,255,255,0.2)', padding: '40px' }}>
+                <td colSpan={7} style={{ ...COL_STYLE, textAlign: 'center', color: 'rgba(255,255,255,0.2)', padding: '40px' }}>
                   No sessions running — enter a URL above and click Start Bots
                 </td>
               </tr>
