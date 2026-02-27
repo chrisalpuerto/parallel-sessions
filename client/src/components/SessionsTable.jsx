@@ -9,8 +9,12 @@ const STATUS_CONFIG = {
   awaiting_orders: { label: 'Awaiting Orders', color: '#ab47bc', bg: 'rgba(171,71,188,0.12)'  },
   manual_takeover: { label: 'Manual Takeover', color: '#ffca28', bg: 'rgba(255,202,40,0.12)'  },
   running_auto:    { label: 'Auto Running',    color: '#42a5f5', bg: 'rgba(66,165,245,0.12)'  },
-  login_required:  { label: 'Login Req',       color: '#ff9800', bg: 'rgba(255,152,0,0.12)'   },
-  finished:        { label: 'Finished',        color: '#00e676', bg: 'rgba(0,230,118,0.12)'   },
+  login_required:    { label: 'Login Req',     color: '#ff9800', bg: 'rgba(255,152,0,0.12)'    },
+  shipping_required: { label: 'Shipping Req', color: '#29b6f6', bg: 'rgba(41,182,246,0.12)'  },
+  card_required:     { label: 'Card Req',     color: '#ec407a', bg: 'rgba(236,64,122,0.12)'  },
+  receipt_required:  { label: 'Receipt Req', color: '#ab47bc', bg: 'rgba(171,71,188,0.12)'  },
+  complete:          { label: 'COMPLETE!',   color: '#00e676', bg: 'rgba(0,230,118,0.18)'   },
+  finished:          { label: 'Finished',    color: '#00e676', bg: 'rgba(0,230,118,0.12)'   },
   error:           { label: 'Error',           color: '#ff5252', bg: 'rgba(255,82,82,0.12)'   },
 }
 
@@ -20,7 +24,7 @@ const OPTION_CONFIG = {
   auto:      { label: 'Auto',      color: '#6c63ff', bg: 'rgba(108,99,255,0.12)' },
 }
 
-const ACTIVE_STATUSES = new Set(['starting', 'running', 'awaiting_orders', 'running_auto', 'manual_takeover', 'login_required'])
+const ACTIVE_STATUSES = new Set(['starting', 'running', 'awaiting_orders', 'running_auto', 'manual_takeover', 'login_required', 'shipping_required', 'card_required', 'receipt_required'])
 
 function formatTargetSite(url) {
   try {
@@ -121,13 +125,124 @@ const CHIP_STYLE = {
   borderRadius: '4px',
 }
 
-function SessionRow({ session, sendCommand, targetSite }) {
-  const isAwaiting = session.status === 'awaiting_orders'
-  const isLoginRequired = session.status === 'login_required'
+const US_STATES = [
+  'Alabama','Alaska','Arizona','Arkansas','California','Colorado','Connecticut',
+  'Delaware','Florida','Georgia','Hawaii','Idaho','Illinois','Indiana','Iowa',
+  'Kansas','Kentucky','Louisiana','Maine','Maryland','Massachusetts','Michigan',
+  'Minnesota','Mississippi','Missouri','Montana','Nebraska','Nevada','New Hampshire',
+  'New Jersey','New Mexico','New York','North Carolina','North Dakota','Ohio',
+  'Oklahoma','Oregon','Pennsylvania','Rhode Island','South Carolina','South Dakota',
+  'Tennessee','Texas','Utah','Vermont','Virginia','Washington','West Virginia',
+  'Wisconsin','Wyoming',
+]
 
+const INPUT_STYLE = {
+  background: 'rgba(255,255,255,0.06)',
+  border: '1px solid rgba(255,255,255,0.12)',
+  borderRadius: '8px',
+  padding: '9px 12px',
+  fontSize: '13px',
+  color: '#fff',
+  outline: 'none',
+  width: '100%',
+  boxSizing: 'border-box',
+}
+
+const SELECT_STYLE = {
+  ...INPUT_STYLE,
+  cursor: 'pointer',
+}
+
+const OVERLAY_STYLE = {
+  position: 'fixed',
+  inset: 0,
+  zIndex: 1000,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  background: 'rgba(0,0,0,0.6)',
+  backdropFilter: 'blur(4px)',
+}
+
+const MODAL_CARD_STYLE = {
+  background: '#1a1a2e',
+  border: '1px solid rgba(255,255,255,0.1)',
+  borderRadius: '14px',
+  padding: '28px 32px',
+  width: '460px',
+  maxWidth: '95vw',
+  maxHeight: '90vh',
+  overflowY: 'auto',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '16px',
+}
+
+function ModalHeader({ title, subtitle }) {
+  return (
+    <div>
+      <h3 style={{ fontSize: '15px', fontWeight: 600, color: '#fff', margin: 0 }}>{title}</h3>
+      {subtitle && <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.35)', marginTop: '4px' }}>{subtitle}</p>}
+    </div>
+  )
+}
+
+function FieldRow({ children }) {
+  return <div style={{ display: 'flex', gap: '10px' }}>{children}</div>
+}
+
+function Field({ label, children }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
+      <label style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+        {label}
+      </label>
+      {children}
+    </div>
+  )
+}
+
+function SessionRow({ session, sendCommand, targetSite }) {
+  const isAwaiting         = session.status === 'awaiting_orders'
+  const isLoginRequired    = session.status === 'login_required'
+  const isShippingRequired = session.status === 'shipping_required'
+  const isCardRequired     = session.status === 'card_required'
+  const isReceiptRequired  = session.status === 'receipt_required'
+
+  // Login state
   const [showLoginModal, setShowLoginModal] = useState(false)
-  const [loginEmail, setLoginEmail] = useState('')
-  const [loginPassword, setLoginPassword] = useState('')
+  const [loginEmail, setLoginEmail]         = useState('')
+  const [loginPassword, setLoginPassword]   = useState('')
+
+  // Shipping state
+  const [showShippingModal, setShowShippingModal] = useState(false)
+  const [shFirstName, setShFirstName] = useState('')
+  const [shLastName,  setShLastName]  = useState('')
+  const [shAddress,   setShAddress]   = useState('')
+  const [shApartment, setShApartment] = useState('')
+  const [shCity,      setShCity]      = useState('')
+  const [shState,     setShState]     = useState('California')
+  const [shZip,       setShZip]       = useState('')
+
+  // Card state
+  // Receipt state
+  const [showReceiptModal, setShowReceiptModal] = useState(false)
+  const [receiptEmail,     setReceiptEmail]     = useState('')
+
+  const [showCardModal,     setShowCardModal]     = useState(false)
+  const [cdFirstName,       setCdFirstName]       = useState('')
+  const [cdLastName,        setCdLastName]        = useState('')
+  const [cdCardNumber,      setCdCardNumber]      = useState('')
+  const [cdCvc,             setCdCvc]             = useState('')
+  const [cdMonth,           setCdMonth]           = useState('')
+  const [cdYear,            setCdYear]            = useState('')
+  const [cdSameAsShipping,  setCdSameAsShipping]  = useState(false)
+  const [cdPhone,           setCdPhone]           = useState('')
+  const [cdAddress,         setCdAddress]         = useState('')
+  const [cdApartment,       setCdApartment]       = useState('')
+  const [cdCity,            setCdCity]            = useState('')
+  const [cdState,           setCdState]           = useState('California')
+  const [cdZip,             setCdZip]             = useState('')
 
   const handleLoginSubmit = (e) => {
     e.preventDefault()
@@ -135,6 +250,36 @@ function SessionRow({ session, sendCommand, targetSite }) {
     setShowLoginModal(false)
     setLoginEmail('')
     setLoginPassword('')
+  }
+
+  const handleShippingSubmit = (e) => {
+    e.preventDefault()
+    sendCommand(session.instance, {
+      firstName: shFirstName, lastName: shLastName,
+      address: shAddress, apartment: shApartment,
+      city: shCity, state: shState, zip: shZip,
+    })
+    setShowShippingModal(false)
+  }
+
+  const handleReceiptSubmit = (e) => {
+    e.preventDefault()
+    sendCommand(session.instance, { receiptEmail })
+    setShowReceiptModal(false)
+    setReceiptEmail('')
+  }
+
+  const handleCardSubmit = (e) => {
+    e.preventDefault()
+    sendCommand(session.instance, {
+      firstName: cdFirstName, lastName: cdLastName,
+      cardNumber: cdCardNumber, cvc: cdCvc,
+      month: cdMonth, year: cdYear,
+      sameAsShipping: cdSameAsShipping,
+      phone: cdPhone, address: cdAddress, apartment: cdApartment,
+      city: cdCity, state: cdState, zip: cdZip,
+    })
+    setShowCardModal(false)
   }
 
   return (
@@ -203,96 +348,194 @@ function SessionRow({ session, sendCommand, targetSite }) {
       <td style={{ ...COL_STYLE, color: 'rgba(255,255,255,0.3)', fontSize: '13px', fontStyle: 'italic' }}>
         awaiting
       </td>
+
       <td style={COL_STYLE}>
-        {isLoginRequired ? (
+        {isLoginRequired && (
           <button style={CMD_BTN('#ff9800')} onClick={() => setShowLoginModal(true)}>
             Login
           </button>
-        ) : (
+        )}
+        {isShippingRequired && (
+          <button style={CMD_BTN('#29b6f6')} onClick={() => setShowShippingModal(true)}>
+            Shipping
+          </button>
+        )}
+        {isCardRequired && (
+          <button style={CMD_BTN('#ec407a')} onClick={() => setShowCardModal(true)}>
+            Card
+          </button>
+        )}
+        {isReceiptRequired && (
+          <button style={CMD_BTN('#ab47bc')} onClick={() => setShowReceiptModal(true)}>
+            Receipt
+          </button>
+        )}
+        {!isLoginRequired && !isShippingRequired && !isCardRequired && !isReceiptRequired && (
           <OptionBadge option={session.option} />
         )}
 
+        {/* ── Login Modal ─────────────────────────────────────────────────── */}
         {showLoginModal && (
-          <div
-            style={{
-              position: 'fixed',
-              inset: 0,
-              zIndex: 1000,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'rgba(0,0,0,0.6)',
-              backdropFilter: 'blur(4px)',
-            }}
-            onClick={(e) => { if (e.target === e.currentTarget) setShowLoginModal(false) }}
-          >
-            <div style={{
-              background: '#1a1a2e',
-              border: '1px solid rgba(255,255,255,0.1)',
-              borderRadius: '14px',
-              padding: '28px 32px',
-              minWidth: '320px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '16px',
-            }}>
-              <div>
-                <h3 style={{ fontSize: '15px', fontWeight: 600, color: '#fff', margin: 0 }}>
-                  Login — Bot {session.instance}
-                </h3>
-                <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.35)', marginTop: '4px' }}>
-                  Enter credentials to resume the session
-                </p>
-              </div>
+          <div style={OVERLAY_STYLE} onClick={(e) => { if (e.target === e.currentTarget) setShowLoginModal(false) }}>
+            <div style={MODAL_CARD_STYLE}>
+              <ModalHeader title={`Login — Bot ${session.instance}`} subtitle="Enter credentials to resume the session" />
               <form onSubmit={handleLoginSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <input
-                  type="email"
-                  placeholder="Email"
-                  autoFocus
-                  required
-                  value={loginEmail}
-                  onChange={e => setLoginEmail(e.target.value)}
-                  style={{
-                    background: 'rgba(255,255,255,0.06)',
-                    border: '1px solid rgba(255,255,255,0.12)',
-                    borderRadius: '8px',
-                    padding: '9px 12px',
-                    fontSize: '13px',
-                    color: '#fff',
-                    outline: 'none',
-                  }}
-                />
-                <input
-                  type="password"
-                  placeholder="Password"
-                  required
-                  value={loginPassword}
-                  onChange={e => setLoginPassword(e.target.value)}
-                  style={{
-                    background: 'rgba(255,255,255,0.06)',
-                    border: '1px solid rgba(255,255,255,0.12)',
-                    borderRadius: '8px',
-                    padding: '9px 12px',
-                    fontSize: '13px',
-                    color: '#fff',
-                    outline: 'none',
-                  }}
-                />
-                <button
-                  type="submit"
-                  style={{
-                    padding: '9px',
-                    borderRadius: '8px',
-                    border: 'none',
-                    background: '#ff9800',
-                    color: '#fff',
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    marginTop: '4px',
-                  }}
-                >
+                <input type="email" placeholder="Email" autoFocus required value={loginEmail}
+                  onChange={e => setLoginEmail(e.target.value)} style={INPUT_STYLE} />
+                <input type="password" placeholder="Password" required value={loginPassword}
+                  onChange={e => setLoginPassword(e.target.value)} style={INPUT_STYLE} />
+                <button type="submit" style={{ padding: '9px', borderRadius: '8px', border: 'none', background: '#ff9800', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: 'pointer', marginTop: '4px' }}>
                   Send Credentials
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ── Shipping Address Modal ──────────────────────────────────────── */}
+        {showShippingModal && (
+          <div style={OVERLAY_STYLE} onClick={(e) => { if (e.target === e.currentTarget) setShowShippingModal(false) }}>
+            <div style={MODAL_CARD_STYLE}>
+              <ModalHeader title={`Shipping Address — Bot ${session.instance}`} subtitle="Enter the shipping details to continue checkout" />
+              <form onSubmit={handleShippingSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <FieldRow>
+                  <Field label="First Name">
+                    <input placeholder="First Name" required value={shFirstName}
+                      onChange={e => setShFirstName(e.target.value)} style={INPUT_STYLE} />
+                  </Field>
+                  <Field label="Last Name">
+                    <input placeholder="Last Name" required value={shLastName}
+                      onChange={e => setShLastName(e.target.value)} style={INPUT_STYLE} />
+                  </Field>
+                </FieldRow>
+                <Field label="Address">
+                  <input placeholder="Street Address" required value={shAddress}
+                    onChange={e => setShAddress(e.target.value)} style={INPUT_STYLE} />
+                </Field>
+                <Field label="Apartment / Unit (optional)">
+                  <input placeholder="Apt, Suite, Unit…" value={shApartment}
+                    onChange={e => setShApartment(e.target.value)} style={INPUT_STYLE} />
+                </Field>
+                <FieldRow>
+                  <Field label="City">
+                    <input placeholder="City" required value={shCity}
+                      onChange={e => setShCity(e.target.value)} style={INPUT_STYLE} />
+                  </Field>
+                  <Field label="State">
+                    <select required value={shState} onChange={e => setShState(e.target.value)} style={SELECT_STYLE}>
+                      {US_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="Zip / Postal">
+                    <input placeholder="90041" required value={shZip}
+                      onChange={e => setShZip(e.target.value)} style={INPUT_STYLE} />
+                  </Field>
+                </FieldRow>
+                <button type="submit" style={{ padding: '9px', borderRadius: '8px', border: 'none', background: '#29b6f6', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: 'pointer', marginTop: '4px' }}>
+                  Done
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ── Receipt Email Modal ─────────────────────────────────────────── */}
+        {showReceiptModal && (
+          <div style={OVERLAY_STYLE} onClick={(e) => { if (e.target === e.currentTarget) setShowReceiptModal(false) }}>
+            <div style={MODAL_CARD_STYLE}>
+              <ModalHeader
+                title={`Receipt Email — Bot ${session.instance}`}
+                subtitle="Enter the email address for your order receipt"
+              />
+              <form onSubmit={handleReceiptSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <input
+                  type="email" placeholder="receipt@email.com" autoFocus required
+                  value={receiptEmail} onChange={e => setReceiptEmail(e.target.value)}
+                  style={INPUT_STYLE}
+                />
+                <button type="submit" style={{ padding: '9px', borderRadius: '8px', border: 'none', background: '#ab47bc', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: 'pointer', marginTop: '4px' }}>
+                  Done
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ── Card Details Modal ──────────────────────────────────────────── */}
+        {showCardModal && (
+          <div style={OVERLAY_STYLE} onClick={(e) => { if (e.target === e.currentTarget) setShowCardModal(false) }}>
+            <div style={MODAL_CARD_STYLE}>
+              <ModalHeader title={`Card Details — Bot ${session.instance}`} subtitle="Enter payment information to continue checkout" />
+              <form onSubmit={handleCardSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <FieldRow>
+                  <Field label="First Name">
+                    <input placeholder="First Name" required value={cdFirstName}
+                      onChange={e => setCdFirstName(e.target.value)} style={INPUT_STYLE} />
+                  </Field>
+                  <Field label="Last Name">
+                    <input placeholder="Last Name" required value={cdLastName}
+                      onChange={e => setCdLastName(e.target.value)} style={INPUT_STYLE} />
+                  </Field>
+                </FieldRow>
+                <FieldRow>
+                  <Field label="Card Number">
+                    <input placeholder="Card Number" required value={cdCardNumber}
+                      onChange={e => setCdCardNumber(e.target.value)} style={INPUT_STYLE} />
+                  </Field>
+                  <Field label="CVC / CVV">
+                    <input placeholder="CVC" required value={cdCvc}
+                      onChange={e => setCdCvc(e.target.value)} style={{ ...INPUT_STYLE, maxWidth: '90px' }} />
+                  </Field>
+                </FieldRow>
+                <FieldRow>
+                  <Field label="Month">
+                    <input placeholder="MM" required maxLength={2} value={cdMonth}
+                      onChange={e => setCdMonth(e.target.value)} style={INPUT_STYLE} />
+                  </Field>
+                  <Field label="Year">
+                    <input placeholder="YYYY" required maxLength={4} value={cdYear}
+                      onChange={e => setCdYear(e.target.value)} style={INPUT_STYLE} />
+                  </Field>
+                </FieldRow>
+                <Field label="Contact Phone">
+                  <input placeholder="(323) 000-0000" value={cdPhone}
+                    onChange={e => setCdPhone(e.target.value)} style={INPUT_STYLE} />
+                </Field>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: 'rgba(255,255,255,0.7)' }}>
+                  <input type="checkbox" checked={cdSameAsShipping}
+                    onChange={e => setCdSameAsShipping(e.target.checked)}
+                    style={{ width: '14px', height: '14px', cursor: 'pointer' }} />
+                  Same as my shipping address
+                </label>
+                {!cdSameAsShipping && (
+                  <>
+                    <Field label="Billing Address">
+                      <input placeholder="Street Address" required value={cdAddress}
+                        onChange={e => setCdAddress(e.target.value)} style={INPUT_STYLE} />
+                    </Field>
+                    <Field label="Apartment / Unit (optional)">
+                      <input placeholder="Apt, Suite, Unit…" value={cdApartment}
+                        onChange={e => setCdApartment(e.target.value)} style={INPUT_STYLE} />
+                    </Field>
+                    <FieldRow>
+                      <Field label="City">
+                        <input placeholder="City" required value={cdCity}
+                          onChange={e => setCdCity(e.target.value)} style={INPUT_STYLE} />
+                      </Field>
+                      <Field label="State">
+                        <select required value={cdState} onChange={e => setCdState(e.target.value)} style={SELECT_STYLE}>
+                          {US_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </Field>
+                      <Field label="Zip / Postal">
+                        <input placeholder="90041" required value={cdZip}
+                          onChange={e => setCdZip(e.target.value)} style={INPUT_STYLE} />
+                      </Field>
+                    </FieldRow>
+                  </>
+                )}
+                <button type="submit" style={{ padding: '9px', borderRadius: '8px', border: 'none', background: '#ec407a', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: 'pointer', marginTop: '4px' }}>
+                  Done
                 </button>
               </form>
             </div>
