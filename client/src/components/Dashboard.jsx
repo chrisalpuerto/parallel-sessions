@@ -6,6 +6,7 @@ export default function Dashboard() {
   const [targetUrl, setTargetUrl] = useState('')
   const [committedUrl, setCommittedUrl] = useState('')
   const [useProxy, setUseProxy] = useState(false)
+  const [numBots, setNumBots] = useState(5)
   const [testActive, setTestActive] = useState(false)
   const [sessions, setSessions] = useState({})
   const wsRef = useRef(null)
@@ -37,7 +38,7 @@ export default function Dashboard() {
     await fetch('http://localhost:8000/start-test', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ target_url: targetUrl.trim(), use_proxy: useProxy }),
+      body: JSON.stringify({ target_url: targetUrl.trim(), use_proxy: useProxy, num_bots: numBots }),
     })
     setTestActive(true)
   }
@@ -152,6 +153,28 @@ export default function Dashboard() {
           ))}
         </div>
 
+        <label style={{ fontSize: '13px', fontWeight: 500, color: 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap' }}>
+          # bots?
+        </label>
+        <input
+          type="number"
+          min={1}
+          value={numBots}
+          onChange={e => setNumBots(Math.max(1, parseInt(e.target.value) || 1))}
+          disabled={testActive}
+          style={{
+            width: '70px',
+            background: 'rgba(255,255,255,0.06)',
+            border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: '8px',
+            padding: '9px 10px',
+            fontSize: '14px',
+            color: testActive ? 'rgba(255,255,255,0.3)' : '#fff',
+            outline: 'none',
+            textAlign: 'center',
+            opacity: testActive ? 0.4 : 1,
+          }}
+        />
         <label style={{ fontSize: '13px', fontWeight: 500, color: 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap' }}>
           Target Site URL
         </label>

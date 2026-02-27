@@ -9,6 +9,7 @@ const STATUS_CONFIG = {
   awaiting_orders: { label: 'Awaiting Orders', color: '#ab47bc', bg: 'rgba(171,71,188,0.12)'  },
   manual_takeover: { label: 'Manual Takeover', color: '#ffca28', bg: 'rgba(255,202,40,0.12)'  },
   running_auto:    { label: 'Auto Running',    color: '#42a5f5', bg: 'rgba(66,165,245,0.12)'  },
+  login_required:  { label: 'Login Req',       color: '#ff9800', bg: 'rgba(255,152,0,0.12)'   },
   finished:        { label: 'Finished',        color: '#00e676', bg: 'rgba(0,230,118,0.12)'   },
   error:           { label: 'Error',           color: '#ff5252', bg: 'rgba(255,82,82,0.12)'   },
 }
@@ -19,7 +20,7 @@ const OPTION_CONFIG = {
   auto:      { label: 'Auto',      color: '#6c63ff', bg: 'rgba(108,99,255,0.12)' },
 }
 
-const ACTIVE_STATUSES = new Set(['starting', 'running', 'awaiting_orders', 'running_auto', 'manual_takeover'])
+const ACTIVE_STATUSES = new Set(['starting', 'running', 'awaiting_orders', 'running_auto', 'manual_takeover', 'login_required'])
 
 function formatTargetSite(url) {
   try {
@@ -122,6 +123,19 @@ const CHIP_STYLE = {
 
 function SessionRow({ session, sendCommand, targetSite }) {
   const isAwaiting = session.status === 'awaiting_orders'
+  const isLoginRequired = session.status === 'login_required'
+
+  const [showLoginModal, setShowLoginModal] = useState(false)
+  const [loginEmail, setLoginEmail] = useState('')
+  const [loginPassword, setLoginPassword] = useState('')
+
+  const handleLoginSubmit = (e) => {
+    e.preventDefault()
+    sendCommand(session.instance, { email: loginEmail, password: loginPassword })
+    setShowLoginModal(false)
+    setLoginEmail('')
+    setLoginPassword('')
+  }
 
   return (
     <tr
@@ -190,7 +204,100 @@ function SessionRow({ session, sendCommand, targetSite }) {
         awaiting
       </td>
       <td style={COL_STYLE}>
-        <OptionBadge option={session.option} />
+        {isLoginRequired ? (
+          <button style={CMD_BTN('#ff9800')} onClick={() => setShowLoginModal(true)}>
+            Login
+          </button>
+        ) : (
+          <OptionBadge option={session.option} />
+        )}
+
+        {showLoginModal && (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 1000,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'rgba(0,0,0,0.6)',
+              backdropFilter: 'blur(4px)',
+            }}
+            onClick={(e) => { if (e.target === e.currentTarget) setShowLoginModal(false) }}
+          >
+            <div style={{
+              background: '#1a1a2e',
+              border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: '14px',
+              padding: '28px 32px',
+              minWidth: '320px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
+            }}>
+              <div>
+                <h3 style={{ fontSize: '15px', fontWeight: 600, color: '#fff', margin: 0 }}>
+                  Login — Bot {session.instance}
+                </h3>
+                <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.35)', marginTop: '4px' }}>
+                  Enter credentials to resume the session
+                </p>
+              </div>
+              <form onSubmit={handleLoginSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <input
+                  type="email"
+                  placeholder="Email"
+                  autoFocus
+                  required
+                  value={loginEmail}
+                  onChange={e => setLoginEmail(e.target.value)}
+                  style={{
+                    background: 'rgba(255,255,255,0.06)',
+                    border: '1px solid rgba(255,255,255,0.12)',
+                    borderRadius: '8px',
+                    padding: '9px 12px',
+                    fontSize: '13px',
+                    color: '#fff',
+                    outline: 'none',
+                  }}
+                />
+                <input
+                  type="password"
+                  placeholder="Password"
+                  required
+                  value={loginPassword}
+                  onChange={e => setLoginPassword(e.target.value)}
+                  style={{
+                    background: 'rgba(255,255,255,0.06)',
+                    border: '1px solid rgba(255,255,255,0.12)',
+                    borderRadius: '8px',
+                    padding: '9px 12px',
+                    fontSize: '13px',
+                    color: '#fff',
+                    outline: 'none',
+                  }}
+                />
+                <button
+                  type="submit"
+                  style={{
+                    padding: '9px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: '#ff9800',
+                    color: '#fff',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    marginTop: '4px',
+                  }}
+                >
+                  Send Credentials
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
       </td>
     </tr>
   )
